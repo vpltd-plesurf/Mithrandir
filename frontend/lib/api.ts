@@ -10,8 +10,10 @@ import type {
 } from "./types";
 
 const API_BASE = "/api";
-// Upload directly to backend to avoid Next.js proxy body size limits
-const BACKEND_DIRECT = "http://localhost:8000/api";
+// Direct browser→backend for SSE streams and large uploads (bypasses Next.js proxy)
+const BACKEND_DIRECT = process.env.NEXT_PUBLIC_BACKEND_URL
+  ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api`
+  : "http://localhost:8000/api";
 
 async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, init);
