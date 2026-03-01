@@ -1,10 +1,13 @@
 # Synology Deployment Setup
 
-Mithrandir runs as two Docker containers on the Synology NAS:
-- **mithrandir-frontend** — Next.js UI on port 3001
-- **mithrandir-backend** — FastAPI on port 8000
+Mithrandir runs as two Docker containers on the Synology NAS (192.168.1.125):
+- **mithrandir-frontend** — Next.js UI → http://192.168.1.125:3001
+- **mithrandir-backend** — FastAPI → http://192.168.1.125:8000/docs
 
-Ollama (LLM + embeddings) stays on your Mac and is reached over the local network.
+Ollama (LLM + embeddings) runs on the Mac (192.168.1.72) and is reached over the local network.
+
+Also running on the NAS:
+- **windsmeres-libram** — Wow Planner → http://192.168.1.125:3000
 
 ---
 
@@ -13,42 +16,33 @@ Ollama (LLM + embeddings) stays on your Mac and is reached over the local networ
 By default Ollama only listens on localhost. Run this once, then restart Ollama:
 
 ```bash
-# Set via launchctl (persists across reboots)
 launchctl setenv OLLAMA_HOST "0.0.0.0:11434"
-# Then restart Ollama from the menu bar or:
-pkill ollama && ollama serve
+# Then restart Ollama from the menu bar
 ```
 
-Find your Mac's local IP (you'll need it in step 3):
-
+Models required (must be pulled on the Mac):
 ```bash
-ipconfig getifaddr en0
+ollama pull deepseek-r1:14b
+ollama pull mxbai-embed-large
 ```
 
 ---
 
-## 2. Create the directory on the Synology
+## 2. Synology directory structure
 
-SSH into your NAS:
-
-```bash
-ssh admin@192.168.1.125
-mkdir -p /volume1/docker/mithrandir/data
-mkdir -p /volume1/docker/mithrandir/books
 ```
-
-The `books/` folder is where you upload your EPUB and PDF files.
-Books added here are automatically scanned by the backend on startup.
+/volume1/docker/mithrandir/
+├── .env          # environment variables
+├── books/        # upload EPUBs and PDFs here
+├── data/         # ChromaDB + SQLite (auto-created, persisted between restarts)
+└── (source files extracted by deploy script)
+```
 
 ---
 
-## 3. Create the .env file on the Synology
+## 3. .env file on the Synology
 
-```bash
-nano /volume1/docker/mithrandir/.env
-```
-
-Paste (replacing the IP with your Mac's actual local IP from step 1):
+Create at `/volume1/docker/mithrandir/.env`:
 
 ```
 OLLAMA_BASE_URL=http://192.168.1.72:11434
@@ -56,73 +50,62 @@ CHAT_MODEL=deepseek-r1:14b
 EMBEDDING_MODEL=mxbai-embed-large
 ```
 
----
-
-## 4. Set up GitHub repository
-
-1. Create a new **private** GitHub repo named `Mithrandir` under `vpltd-plesurf`
-2. Initialise and push this project:
-
+To create from Mac:
 ```bash
-cd /Users/paullesurf/Mithrandir
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin git@github.com:vpltd-plesurf/Mithrandir.git
-git push -u origin main
+scp /Users/paullesurf/Mithrandir/.env.synology paullesurf@192.168.1.125:/volume1/docker/mithrandir/.env
 ```
 
 ---
 
-## 5. Add the DEPLOY_KEY GitHub secret
+## 4. GitHub repository
 
-This is the same SSH key already used by Wow Planner. In the new repo:
-
-- Go to **Settings → Secrets and variables → Actions**
-- Add secret: `DEPLOY_KEY` — paste your private SSH key (the one whose public key is in the NAS `~/.ssh/authorized_keys`)
+- Repo: https://github.com/vpltd-plesurf/Mithrandir (public)
+- Deploy key: `DEPLOY_KEY` secret in GitHub Actions settings
+- SSH public key is in `/var/services/homes/PaulLesurf/.ssh/authorized_keys` on the NAS
+- Private key stored at `~/.ssh/synology_deploy` on the Mac
 
 ---
 
-## 6. First manual deploy
+## 5. Deploying
 
-Before GitHub Actions takes over, deploy manually once to verify everything works:
+Every push to `main` auto-deploys via GitHub Actions (SSH → Synology → docker compose up).
 
+For a manual deploy (e.g. first time or after NAS restart):
 ```bash
-ssh admin@192.168.1.125
+ssh paullesurf@192.168.1.125
 cd /volume1/docker/mithrandir
 curl -L https://github.com/vpltd-plesurf/Mithrandir/archive/refs/heads/main.zip -o app.zip
 python3 -m zipfile -e app.zip .
-mv Mithrandir-main/* .
+cp -rf Mithrandir-main/* .
 rm -rf Mithrandir-main app.zip
 sudo docker compose up -d --build
 ```
 
----
-
-## 7. Access the app
-
-- Frontend: http://192.168.1.125:3001
-- Backend API: http://192.168.1.125:8000/docs
+> Note: use `cp -rf` not `mv` if directories already exist from a previous deploy.
 
 ---
 
-## Uploading books
+## 6. Copying book data to the NAS
 
-Copy EPUBs or PDFs to the NAS books folder:
+SCP doesn't work on this Synology (SFTP subsystem disabled). Use tar over SSH:
 
 ```bash
-scp ~/path/to/book.epub admin@192.168.1.125:/volume1/docker/mithrandir/books/
+# Copy ChromaDB + SQLite data
+tar czf - -C /Users/paullesurf/Mithrandir/backend data | ssh paullesurf@192.168.1.125 "tar xzf - -C /volume1/docker/mithrandir/"
+
+# Copy books library
+tar czf - -C /Users/paullesurf/Mithrandir books | ssh paullesurf@192.168.1.125 "tar xzf - -C /volume1/docker/mithrandir/"
 ```
 
-Then restart the backend to trigger indexing:
-
+Then restart the backend:
 ```bash
-ssh admin@192.168.1.125
-sudo docker restart mithrandir-backend
+ssh paullesurf@192.168.1.125 "sudo docker restart mithrandir-backend"
 ```
 
 ---
 
-## Ongoing deploys
+## 7. Adding new books
 
-After the initial setup, every push to `main` on GitHub will automatically deploy to the Synology via GitHub Actions.
+1. Upload the EPUB or PDF to `/volume1/docker/mithrandir/books/` via Synology File Station
+2. Restart the backend: `sudo docker restart mithrandir-backend`
+3. The backend scans the books directory on startup and indexes any new files
