@@ -7,9 +7,9 @@ import type { CharacterGraph as CharacterGraphType } from "@/lib/types";
 import { fetchCharacterGraph } from "@/lib/api";
 import Spinner from "@/components/Spinner";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), {
   ssr: false,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }) as any;
 
 const raceColors: Record<string, string> = {
@@ -49,6 +49,7 @@ export default function CharacterGraph() {
   const [activeRaces, setActiveRaces] = useState<Set<string>>(new Set());
   const [availableRaces, setAvailableRaces] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const router = useRouter();
