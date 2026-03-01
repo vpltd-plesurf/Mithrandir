@@ -2,7 +2,7 @@
 
 from typing import Callable
 
-import ollama as ollama_client
+from ollama_client import client as ollama_client
 
 from config import EMBEDDING_MODEL, EMBEDDING_BATCH_SIZE
 

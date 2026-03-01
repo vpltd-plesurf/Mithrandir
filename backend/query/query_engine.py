@@ -3,7 +3,7 @@
 import re
 from typing import AsyncGenerator
 
-import ollama as ollama_client
+from ollama_client import client as ollama_client
 
 from config import EMBEDDING_MODEL, CHAT_MODEL, SYSTEM_PROMPT, TOP_K
 from models.vectorstore import get_collection

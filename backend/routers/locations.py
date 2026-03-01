@@ -48,7 +48,7 @@ async def get_location_mentions(
     collection = get_collection()
 
     try:
-        import ollama
+        from ollama_client import client as ollama
         from config import EMBEDDING_MODEL
         response = ollama.embed(model=EMBEDDING_MODEL, input=name)
         embedding = response["embeddings"][0]

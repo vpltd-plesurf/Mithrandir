@@ -56,7 +56,7 @@ async def get_character_mentions(
 
     # Search by embedding the character name for semantic relevance
     try:
-        import ollama
+        from ollama_client import client as ollama
         from config import EMBEDDING_MODEL
         response = ollama.embed(model=EMBEDDING_MODEL, input=name)
         embedding = response["embeddings"][0]

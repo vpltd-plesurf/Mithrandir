@@ -1,7 +1,7 @@
 """System endpoints: health check, model listing."""
 
 from fastapi import APIRouter
-import ollama as ollama_client
+from ollama_client import client as ollama_client
 
 from config import OLLAMA_BASE_URL, EMBEDDING_MODEL, CHAT_MODEL
 

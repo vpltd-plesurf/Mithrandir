@@ -6,7 +6,7 @@ import re
 from fastapi import APIRouter, Query
 from sse_starlette.sse import EventSourceResponse
 
-import ollama as ollama_client
+from ollama_client import client as ollama_client
 from config import EMBEDDING_MODEL, CHAT_MODEL, BATTLE_SYSTEM_PROMPT
 from models.vectorstore import get_collection
 from query.context_builder import build_context
