@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: mithrandir-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Ollama running on your Mac — set this to your Mac's local IP
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://192.168.1.72:11434}
+      CHAT_MODEL: ${CHAT_MODEL:-deepseek-r1:14b}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-mxbai-embed-large}
+      FRONTEND_URL: http://localhost:3001
+    volumes:
+      # Persist ChromaDB + SQLite between restarts
+      - ./data:/app/backend/data
+      # Books library — upload EPUBs/PDFs here on the NAS
+      - ./books:/app/books
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # Tells Next.js to proxy /api/* to the backend service
+        BACKEND_URL: http://mithrandir-backend:8000
+    container_name: mithrandir-frontend
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend

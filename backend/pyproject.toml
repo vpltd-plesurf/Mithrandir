@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = []
+
+[project]
+name = "mithrandir-backend"
+version = "0.1.0"
+description = "Mithrandir - Tolkien RAG Backend"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "ollama>=0.4.0",
+    "chromadb>=1.0.0",
+    "ebooklib>=0.18",
+    "beautifulsoup4>=4.12",
+    "pymupdf>=1.24.0",
+    "langchain-text-splitters>=0.3.0",
+    "pydantic>=2.0",
+    "aiosqlite>=0.20.0",
+    "python-multipart>=0.0.9",
+    "sse-starlette>=2.0",
+    "pillow>=10.0",
+    "httpx>=0.27.0",
+    "lxml>=5.0",
+]
+
+[tool.uv]
+override-dependencies = [
+    # onnxruntime has no macOS x86_64 wheels for recent versions.
+    # We don't use it — Ollama handles embeddings — so exclude it.
+    "onnxruntime>=0.0.0; sys_platform == 'never'",
+]

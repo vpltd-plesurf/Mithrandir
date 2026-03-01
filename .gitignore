@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.uv/
+
+# Node
+frontend/node_modules/
+frontend/.next/
+
+# Data (never commit the vector DB or SQLite — they're rebuilt from books)
+backend/data/
+data/
+
+# Books (large binary files — upload directly to the NAS)
+books/
+
+# Environment
+.env
+.env.local
+
+# macOS
+.DS_Store

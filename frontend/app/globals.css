@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+:root {
+  --background: #1a1611;
+  --foreground: #e8dcc8;
+  --surface: #2a2319;
+  --card: #342c1f;
+  --text-primary: #e8dcc8;
+  --text-secondary: #a69880;
+  --accent: #c8a45c;
+  --accent-hover: #d4b76a;
+  --border: #4a3f2f;
+  --mithril: #8fb8c4;
+  --error: #c45c5c;
+  --success: #5cc47a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-border: var(--border);
+  --color-mithril: var(--mithril);
+  --color-error: var(--error);
+  --color-success: var(--success);
+  --font-heading: var(--font-cinzel);
+  --font-body: var(--font-crimson);
+  --font-ui: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-ui), sans-serif;
+  font-size: 18px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out both;
+}
+
+/* Smooth expand/collapse for timeline details */
+.expand-enter {
+  animation: expandIn 0.25s ease-out both;
+}
+
+@keyframes expandIn {
+  from { opacity: 0; max-height: 0; transform: translateY(-4px); }
+  to { opacity: 1; max-height: 500px; transform: translateY(0); }
+}

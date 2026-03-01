@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv:*)",
+      "Bash(pnpm --version:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 index:*)",
+      "WebSearch",
+      "WebFetch(domain:docs.trychroma.com)",
+      "Bash(ollama pull:*)",
+      "Bash(npx create-next-app@15:*)",
+      "Bash(source .venv/bin/activate)",
+      "Bash(timeout 8 uvicorn:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs:*)",
+      "Bash(.venv/bin/python:*)",
+      "Bash(npx next build)",
+      "Bash(for v in 1.19.2 1.18.1 1.17.3 1.16.3)",
+      "Bash(do echo \"=== $v ===\" curl -s \"https://pypi.org/pypi/onnxruntime/$v/json\")",
+      "Bash(chmod:*)",
+      "Bash(find:*)",
+      "Bash(sort:*)",
+      "Bash(mdfind:*)",
+      "Bash(ollama list:*)",
+      "Bash(kill:*)",
+      "Bash(identify:*)",
+      "Bash(sips:*)",
+      "Bash(npx tsc:*)",
+      "Bash(tee:*)",
+      "Bash(git:*)"
+    ]
+  }
+}
