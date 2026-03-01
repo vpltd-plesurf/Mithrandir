@@ -17,7 +17,16 @@ By default Ollama only listens on localhost. Run this once, then restart Ollama:
 
 ```bash
 launchctl setenv OLLAMA_HOST "0.0.0.0:11434"
-# Then restart Ollama from the menu bar
+```
+
+Then restart the Ollama app. If Ollama isn't in the menu bar, start it from the terminal:
+```bash
+OLLAMA_HOST=0.0.0.0:11434 ollama serve
+```
+
+Verify the NAS can reach it:
+```bash
+curl http://192.168.1.72:11434/api/tags
 ```
 
 Models required (must be pulled on the Mac):
