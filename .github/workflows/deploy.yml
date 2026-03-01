@@ -8,10 +8,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@master
         with:
-          host: 192.168.1.125
+          host: 100.68.231.46
           username: paullesurf
           key: ${{ secrets.DEPLOY_KEY }}
           script: |
