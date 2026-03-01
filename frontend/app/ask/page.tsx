@@ -100,14 +100,14 @@ export default function AskPage() {
       if (streaming) return;
 
       const userMsg: ChatMessageType = {
-        id: crypto.randomUUID(),
+        id: (crypto.randomUUID ?? (() => Math.random().toString(36).slice(2)))(),
         role: "user",
         content: question,
         timestamp: new Date(),
       };
 
       const assistantMsg: ChatMessageType = {
-        id: crypto.randomUUID(),
+        id: (crypto.randomUUID ?? (() => Math.random().toString(36).slice(2)))(),
         role: "assistant",
         content: "",
         sources: [],
