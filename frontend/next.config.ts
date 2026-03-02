@@ -1,11 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Disable HTTP keep-alive for proxy connections — prevents ECONNRESET when
-  // backend container restarts and the connection pool has stale sockets.
-  httpAgentOptions: {
-    keepAlive: false,
-  },
   async rewrites() {
     return [
       {
