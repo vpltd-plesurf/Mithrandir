@@ -7,7 +7,9 @@ export async function POST(req: NextRequest) {
 
   const backendRes = await fetch(`${BACKEND_URL}/api/query/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    // Connection: close prevents this SSE socket from being returned to the
+    // shared undici pool, which would cause ECONNRESET on subsequent /api/* rewrites
+    headers: { "Content-Type": "application/json", Connection: "close" },
     body: JSON.stringify(body),
   });
 
