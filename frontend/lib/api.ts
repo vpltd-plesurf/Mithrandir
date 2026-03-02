@@ -199,54 +199,25 @@ export function queryStream(
   }
   if (filters?.top_k) body.top_k = filters.top_k;
 
-  // Two-step pattern: POST to prepare (sends history/filters), then open a
-  // native EventSource (GET). EventSource streams properly in all browsers
-  // including Safari, unlike fetch() ReadableStream or XHR which can buffer.
-  let es: EventSource | null = null;
+  // Pass query JSON directly in the URL so we can use native EventSource (GET).
+  // EventSource streams properly in Safari without any buffering issues.
+  const q = encodeURIComponent(JSON.stringify(body));
+  const es = new EventSource(`${API_BASE}/query/stream?q=${q}`);
+  controller.signal.addEventListener("abort", () => es.close());
 
-  (async () => {
-    try {
-      const res = await fetch(`${API_BASE}/query/prepare`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        callbacks.onError(`Failed to start query: ${res.status}`);
-        return;
-      }
-      const { token } = (await res.json()) as { token: string };
-      if (controller.signal.aborted) return;
-
-      es = new EventSource(`${API_BASE}/query/stream?token=${token}`);
-      controller.signal.addEventListener("abort", () => es?.close());
-
-      es.addEventListener("status", (e) => callbacks.onStatus((e as MessageEvent).data));
-      es.addEventListener("token", (e) => callbacks.onToken((e as MessageEvent).data));
-      es.addEventListener("sources", (e) => {
-        try { callbacks.onSources(JSON.parse((e as MessageEvent).data)); } catch { /* ignore */ }
-      });
-      es.addEventListener("done", () => {
-        es?.close();
-        callbacks.onDone();
-      });
-      es.addEventListener("error", (e) => {
-        es?.close();
-        try {
-          callbacks.onError(JSON.parse((e as MessageEvent).data)?.error ?? "An error occurred.");
-        } catch {
-          callbacks.onError("An error occurred.");
-        }
-      });
-      es.onerror = () => {
-        es?.close();
-        if (!controller.signal.aborted) callbacks.onError("Stream connection failed.");
-      };
-    } catch {
-      if (!controller.signal.aborted) callbacks.onError("Failed to start query.");
-    }
-  })();
+  es.addEventListener("status", (e) => callbacks.onStatus((e as MessageEvent).data));
+  es.addEventListener("token", (e) => callbacks.onToken((e as MessageEvent).data));
+  es.addEventListener("sources", (e) => {
+    try { callbacks.onSources(JSON.parse((e as MessageEvent).data)); } catch { /* ignore */ }
+  });
+  es.addEventListener("done", () => {
+    es.close();
+    callbacks.onDone();
+  });
+  es.onerror = () => {
+    es.close();
+    if (!controller.signal.aborted) callbacks.onError("Stream connection failed.");
+  };
 
   return { abort: () => controller.abort() };
 }
