@@ -30,6 +30,9 @@ services:
         BACKEND_URL: http://mithrandir-backend:8000
         # Browser-side: SSE streams and uploads go direct to the NAS backend port
         NEXT_PUBLIC_BACKEND_URL: http://192.168.1.125:8000
+    environment:
+      # Also needed at runtime for App Router API routes
+      BACKEND_URL: http://mithrandir-backend:8000
     container_name: mithrandir-frontend
     restart: unless-stopped
     ports:
