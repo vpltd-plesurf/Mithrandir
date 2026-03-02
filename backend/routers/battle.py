@@ -6,7 +6,7 @@ import re
 from fastapi import APIRouter, Query
 from sse_starlette.sse import EventSourceResponse
 
-from ollama_client import client as ollama_client
+from ollama_client import async_client as ollama_client
 from config import EMBEDDING_MODEL, CHAT_MODEL, BATTLE_SYSTEM_PROMPT
 from models.vectorstore import get_collection
 from query.context_builder import build_context
@@ -20,10 +20,10 @@ def _strip_think_tags(text: str) -> str:
     return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
 
-def _search_character_evidence(collection, name: str, n_results: int = 6):
+async def _search_character_evidence(collection, name: str, n_results: int = 6):
     """Search ChromaDB for passages about a character's powers and feats."""
     query_text = f"{name} powers abilities feats strength combat"
-    embed_response = ollama_client.embed(model=EMBEDDING_MODEL, input=[query_text])
+    embed_response = await ollama_client.embed(model=EMBEDDING_MODEL, input=[query_text])
     query_embedding = embed_response["embeddings"][0]
 
     results = collection.query(
@@ -45,8 +45,8 @@ async def battle_stream(
         collection = get_collection()
 
         # Search for evidence about each character
-        results_a = _search_character_evidence(collection, character_a)
-        results_b = _search_character_evidence(collection, character_b)
+        results_a = await _search_character_evidence(collection, character_a)
+        results_b = await _search_character_evidence(collection, character_b)
 
         # Build context sections
         context_a, sources_a = build_context(results_a)
@@ -89,12 +89,12 @@ async def battle_stream(
         ]
 
         # Stream from LLM
-        stream = ollama_client.chat(model=CHAT_MODEL, messages=messages, stream=True)
+        stream = await ollama_client.chat(model=CHAT_MODEL, messages=messages, stream=True)
 
         full_response = ""
         in_think_block = False
 
-        for chunk in stream:
+        async for chunk in stream:
             token = chunk["message"]["content"]
             full_response += token
 

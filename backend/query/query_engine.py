@@ -3,7 +3,7 @@
 import re
 from typing import AsyncGenerator
 
-from ollama_client import client as ollama_client
+from ollama_client import async_client as ollama_client
 
 from config import EMBEDDING_MODEL, CHAT_MODEL, SYSTEM_PROMPT, TOP_K
 from models.vectorstore import get_collection
@@ -29,7 +29,7 @@ async def query(
     collection = get_collection()
 
     # Step 1: Embed the question
-    embed_response = ollama_client.embed(model=EMBEDDING_MODEL, input=[question])
+    embed_response = await ollama_client.embed(model=EMBEDDING_MODEL, input=[question])
     query_embedding = embed_response["embeddings"][0]
 
     # Step 2: Build ChromaDB filters
@@ -66,7 +66,7 @@ async def query(
         },
     ]
 
-    response = ollama_client.chat(model=CHAT_MODEL, messages=messages)
+    response = await ollama_client.chat(model=CHAT_MODEL, messages=messages)
     answer = _strip_think_tags(response["message"]["content"])
 
     return {
@@ -94,7 +94,7 @@ async def query_stream(
     collection = get_collection()
 
     # Step 1: Embed the question
-    embed_response = ollama_client.embed(model=EMBEDDING_MODEL, input=[question])
+    embed_response = await ollama_client.embed(model=EMBEDDING_MODEL, input=[question])
     query_embedding = embed_response["embeddings"][0]
 
     # Step 2: Build filters
@@ -136,13 +136,13 @@ async def query_stream(
         },
     ]
 
-    stream = ollama_client.chat(model=CHAT_MODEL, messages=messages, stream=True)
+    stream = await ollama_client.chat(model=CHAT_MODEL, messages=messages, stream=True)
 
     full_response = ""
     in_think_block = False
     answered = False
 
-    for chunk in stream:
+    async for chunk in stream:
         token = chunk["message"]["content"]
         full_response += token
 
