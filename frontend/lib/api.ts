@@ -200,7 +200,7 @@ export function queryStream(
 
   (async () => {
     try {
-      const res = await fetch(`${BACKEND_DIRECT}/query/stream`, {
+      const res = await fetch(`${API_BASE}/query/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
