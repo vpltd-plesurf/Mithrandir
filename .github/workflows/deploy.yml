@@ -42,4 +42,4 @@ jobs:
       - name: Rebuild and restart Docker containers
         run: |
           ssh paullesurf@${{ secrets.SYNOLOGY_TAILSCALE_HOST }} \
-            'cd /volume1/docker/mithrandir && sudo /usr/local/bin/docker compose down && sudo /usr/local/bin/docker compose up -d --build'
+            'cd /volume1/docker/mithrandir && sudo /usr/local/bin/docker compose down --remove-orphans && sudo /usr/local/bin/docker compose up -d --build --remove-orphans'
