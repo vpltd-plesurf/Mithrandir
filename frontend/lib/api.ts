@@ -199,66 +199,63 @@ export function queryStream(
   }
   if (filters?.top_k) body.top_k = filters.top_k;
 
-  (async () => {
-    try {
-      // 60s timeout — if no response headers by then, something is broken
-      const timeoutId = setTimeout(() => controller.abort(), 60_000);
-      const res = await fetch(`/stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+  // Use XHR instead of fetch — Safari buffers fetch() ReadableStream responses
+  // entirely before delivering data, causing SSE to hang. XHR onprogress fires
+  // as each chunk arrives in all browsers including Safari.
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/stream");
+  xhr.setRequestHeader("Content-Type", "application/json");
 
-      if (!res.ok || !res.body) {
-        callbacks.onError(`Request failed: ${res.status}`);
-        return;
+  let processed = 0;
+  let buffer = "";
+
+  function parseBuffer() {
+    const parts = buffer.split("\n\n");
+    buffer = parts.pop() ?? "";
+    for (const block of parts) {
+      let eventType = "message";
+      let data = "";
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event: ")) eventType = line.slice(7).trim();
+        else if (line.startsWith("data: ")) data = line.slice(6);
       }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        // SSE events are separated by double newline
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() ?? "";
-
-        for (const block of parts) {
-          let eventType = "message";
-          let data = "";
-          for (const line of block.split("\n")) {
-            if (line.startsWith("event: ")) eventType = line.slice(7).trim();
-            else if (line.startsWith("data: ")) data = line.slice(6);
-          }
-          if (eventType === "status") {
-            callbacks.onStatus(data);
-          } else if (eventType === "token") {
-            callbacks.onToken(data);
-          } else if (eventType === "sources") {
-            try { callbacks.onSources(JSON.parse(data)); } catch { /* ignore */ }
-          } else if (eventType === "done") {
-            callbacks.onDone();
-          } else if (eventType === "error") {
-            try {
-              callbacks.onError(JSON.parse(data)?.error ?? "An error occurred.");
-            } catch {
-              callbacks.onError("An error occurred.");
-            }
-          }
+      if (eventType === "status") {
+        callbacks.onStatus(data);
+      } else if (eventType === "token") {
+        callbacks.onToken(data);
+      } else if (eventType === "sources") {
+        try { callbacks.onSources(JSON.parse(data)); } catch { /* ignore */ }
+      } else if (eventType === "done") {
+        callbacks.onDone();
+      } else if (eventType === "error") {
+        try {
+          callbacks.onError(JSON.parse(data)?.error ?? "An error occurred.");
+        } catch {
+          callbacks.onError("An error occurred.");
         }
       }
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        callbacks.onError("Stream connection failed.");
-      }
     }
-  })();
+  }
+
+  xhr.onprogress = () => {
+    const newText = xhr.responseText.slice(processed);
+    processed = xhr.responseText.length;
+    buffer += newText;
+    parseBuffer();
+  };
+
+  xhr.onload = () => {
+    // Flush any remaining buffer
+    if (buffer.trim()) parseBuffer();
+  };
+
+  xhr.onerror = () => callbacks.onError("Stream connection failed.");
+  xhr.ontimeout = () => callbacks.onError("Request timed out.");
+  xhr.timeout = 120_000;
+
+  controller.signal.addEventListener("abort", () => xhr.abort());
+
+  xhr.send(JSON.stringify(body));
 
   return { abort: () => controller.abort() };
 }
