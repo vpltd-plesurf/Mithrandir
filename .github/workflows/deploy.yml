@@ -37,7 +37,7 @@ jobs:
             --exclude='backend/data' \
             --exclude='books' \
             . | ssh paullesurf@${{ secrets.SYNOLOGY_TAILSCALE_HOST }} \
-              'cd /volume1/docker/mithrandir && tar xzf - 2>&1 | grep -v "Cannot change mode" || true'
+              'cd /volume1/docker/mithrandir && rm -rf frontend/app backend/routers && tar xzf - 2>&1 | grep -v "Cannot change mode" || true'
 
       - name: Rebuild and restart Docker containers
         run: |
