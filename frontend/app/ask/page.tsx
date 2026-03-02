@@ -31,9 +31,18 @@ export default function AskPage() {
   const locInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetchLibraryStats()
-      .then((stats) => setBooksReady(stats.books_ready))
-      .catch(() => setBooksReady(0));
+    // Retry up to 3 times — transient 500s during deploy shouldn't show "no books"
+    let attempts = 0;
+    const tryStats = () => {
+      fetchLibraryStats()
+        .then((stats) => setBooksReady(stats.books_ready))
+        .catch(() => {
+          attempts++;
+          if (attempts < 3) setTimeout(tryStats, 2000);
+          else setBooksReady(0);
+        });
+    };
+    tryStats();
 
     fetchLibrary()
       .then((data) => {
