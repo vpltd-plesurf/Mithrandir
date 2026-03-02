@@ -12,7 +12,7 @@ services:
     environment:
       # Ollama running on your Mac — set this to your Mac's local IP
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://192.168.1.72:11434}
-      CHAT_MODEL: ${CHAT_MODEL:-deepseek-r1:14b}
+      CHAT_MODEL: ${CHAT_MODEL:-qwen2.5-coder:14b}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-mxbai-embed-large}
       FRONTEND_URL: http://192.168.1.125:3001
     volumes:

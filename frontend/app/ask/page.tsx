@@ -31,14 +31,14 @@ export default function AskPage() {
   const locInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Retry up to 3 times — transient 500s during deploy shouldn't show "no books"
+    // Retry up to 8 times — backend takes ~30-60s to fully start after deploy
     let attempts = 0;
     const tryStats = () => {
       fetchLibraryStats()
         .then((stats) => setBooksReady(stats.books_ready))
         .catch(() => {
           attempts++;
-          if (attempts < 3) setTimeout(tryStats, 2000);
+          if (attempts < 8) setTimeout(tryStats, 5000);
           else setBooksReady(0);
         });
     };
