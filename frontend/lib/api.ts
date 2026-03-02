@@ -180,6 +180,7 @@ export function queryStream(
   history: ConversationTurn[],
   filters: { books?: string[]; characters?: string[]; locations?: string[]; top_k?: number } | undefined,
   callbacks: {
+    onStatus: (status: string) => void;
     onToken: (token: string) => void;
     onSources: (sources: Source[]) => void;
     onDone: () => void;
@@ -232,7 +233,9 @@ export function queryStream(
             if (line.startsWith("event: ")) eventType = line.slice(7).trim();
             else if (line.startsWith("data: ")) data = line.slice(6);
           }
-          if (eventType === "token") {
+          if (eventType === "status") {
+            callbacks.onStatus(data);
+          } else if (eventType === "token") {
             callbacks.onToken(data);
           } else if (eventType === "sources") {
             try { callbacks.onSources(JSON.parse(data)); } catch { /* ignore */ }

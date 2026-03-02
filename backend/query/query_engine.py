@@ -84,10 +84,13 @@ async def query_stream(
     """Stream a RAG query response token by token.
 
     Yields dicts with 'event' and 'data' keys:
+    - {"event": "status", "data": "searching"|"reasoning"|"answering"}
     - {"event": "token", "data": "text"}
     - {"event": "sources", "data": [...]}
     - {"event": "done", "data": ""}
     """
+    yield {"event": "status", "data": "searching"}
+
     collection = get_collection()
 
     # Step 1: Embed the question
@@ -121,6 +124,8 @@ async def query_stream(
         yield {"event": "done", "data": ""}
         return
 
+    yield {"event": "status", "data": "reasoning"}
+
     # Step 5: Stream from LLM
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
@@ -135,6 +140,7 @@ async def query_stream(
 
     full_response = ""
     in_think_block = False
+    answered = False
 
     for chunk in stream:
         token = chunk["message"]["content"]
@@ -151,11 +157,15 @@ async def query_stream(
                 # Yield what remains after stripping
                 if full_response:
                     yield {"event": "token", "data": full_response}
+                    answered = True
                     full_response = ""
             continue
 
         # Normal token — yield it
         if token:
+            if not answered:
+                yield {"event": "status", "data": "answering"}
+                answered = True
             yield {"event": "token", "data": token}
 
     # Send sources

@@ -187,6 +187,7 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
+  status?: "searching" | "reasoning" | "answering";
   sources?: Source[];
   timestamp: Date;
 }

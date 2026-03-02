@@ -139,6 +139,16 @@ export default function AskPage() {
         : undefined;
 
       abortRef.current = queryStream(question, history, filters, {
+        onStatus: (status) => {
+          setMessages((cur) => {
+            const updated = [...cur];
+            const last = updated[updated.length - 1];
+            if (last.role === "assistant" && last.content === "") {
+              updated[updated.length - 1] = { ...last, status: status as ChatMessageType["status"] };
+            }
+            return updated;
+          });
+        },
         onToken: (token) => {
           setMessages((cur) => {
             const updated = [...cur];

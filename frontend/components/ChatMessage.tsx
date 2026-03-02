@@ -30,7 +30,10 @@ export default function ChatMessage({ message }: Props) {
           {message.content === "" && !isUser && (
             <span className="text-text-secondary italic flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-accent animate-pulse" />
-              Thinking...
+              {message.status === "searching" && "Searching the library..."}
+              {message.status === "reasoning" && "Reasoning..."}
+              {message.status === "answering" && "Answering..."}
+              {!message.status && "Thinking..."}
             </span>
           )}
         </div>
