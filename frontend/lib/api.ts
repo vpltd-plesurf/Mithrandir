@@ -203,7 +203,7 @@ export function queryStream(
   // entirely before delivering data, causing SSE to hang. XHR onprogress fires
   // as each chunk arrives in all browsers including Safari.
   const xhr = new XMLHttpRequest();
-  xhr.open("POST", "/stream");
+  xhr.open("POST", `${BACKEND_DIRECT}/query/stream`);
   xhr.setRequestHeader("Content-Type", "application/json");
 
   let processed = 0;
