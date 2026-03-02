@@ -199,63 +199,54 @@ export function queryStream(
   }
   if (filters?.top_k) body.top_k = filters.top_k;
 
-  // Use XHR instead of fetch — Safari buffers fetch() ReadableStream responses
-  // entirely before delivering data, causing SSE to hang. XHR onprogress fires
-  // as each chunk arrives in all browsers including Safari.
-  const xhr = new XMLHttpRequest();
-  xhr.open("POST", `${BACKEND_DIRECT}/query/stream`);
-  xhr.setRequestHeader("Content-Type", "application/json");
+  // Two-step pattern: POST to prepare (sends history/filters), then open a
+  // native EventSource (GET). EventSource streams properly in all browsers
+  // including Safari, unlike fetch() ReadableStream or XHR which can buffer.
+  let es: EventSource | null = null;
 
-  let processed = 0;
-  let buffer = "";
-
-  function parseBuffer() {
-    const parts = buffer.split("\n\n");
-    buffer = parts.pop() ?? "";
-    for (const block of parts) {
-      let eventType = "message";
-      let data = "";
-      for (const line of block.split("\n")) {
-        if (line.startsWith("event: ")) eventType = line.slice(7).trim();
-        else if (line.startsWith("data: ")) data = line.slice(6);
+  (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/query/prepare`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        callbacks.onError(`Failed to start query: ${res.status}`);
+        return;
       }
-      if (eventType === "status") {
-        callbacks.onStatus(data);
-      } else if (eventType === "token") {
-        callbacks.onToken(data);
-      } else if (eventType === "sources") {
-        try { callbacks.onSources(JSON.parse(data)); } catch { /* ignore */ }
-      } else if (eventType === "done") {
+      const { token } = (await res.json()) as { token: string };
+      if (controller.signal.aborted) return;
+
+      es = new EventSource(`${API_BASE}/query/stream?token=${token}`);
+      controller.signal.addEventListener("abort", () => es?.close());
+
+      es.addEventListener("status", (e) => callbacks.onStatus((e as MessageEvent).data));
+      es.addEventListener("token", (e) => callbacks.onToken((e as MessageEvent).data));
+      es.addEventListener("sources", (e) => {
+        try { callbacks.onSources(JSON.parse((e as MessageEvent).data)); } catch { /* ignore */ }
+      });
+      es.addEventListener("done", () => {
+        es?.close();
         callbacks.onDone();
-      } else if (eventType === "error") {
+      });
+      es.addEventListener("error", (e) => {
+        es?.close();
         try {
-          callbacks.onError(JSON.parse(data)?.error ?? "An error occurred.");
+          callbacks.onError(JSON.parse((e as MessageEvent).data)?.error ?? "An error occurred.");
         } catch {
           callbacks.onError("An error occurred.");
         }
-      }
+      });
+      es.onerror = () => {
+        es?.close();
+        if (!controller.signal.aborted) callbacks.onError("Stream connection failed.");
+      };
+    } catch {
+      if (!controller.signal.aborted) callbacks.onError("Failed to start query.");
     }
-  }
-
-  xhr.onprogress = () => {
-    const newText = xhr.responseText.slice(processed);
-    processed = xhr.responseText.length;
-    buffer += newText;
-    parseBuffer();
-  };
-
-  xhr.onload = () => {
-    // Flush any remaining buffer
-    if (buffer.trim()) parseBuffer();
-  };
-
-  xhr.onerror = () => callbacks.onError("Stream connection failed.");
-  xhr.ontimeout = () => callbacks.onError("Request timed out.");
-  xhr.timeout = 120_000;
-
-  controller.signal.addEventListener("abort", () => xhr.abort());
-
-  xhr.send(JSON.stringify(body));
+  })();
 
   return { abort: () => controller.abort() };
 }
