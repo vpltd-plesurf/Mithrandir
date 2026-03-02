@@ -2,7 +2,7 @@
 
 import json
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from sse_starlette.sse import EventSourceResponse
 
 from models.schemas import QueryRequest
@@ -18,38 +18,34 @@ async def query_endpoint(request: QueryRequest):
     if request.filters:
         filters = request.filters.model_dump(exclude_none=True)
 
+    history = [m.model_dump() for m in request.history] if request.history else None
+
     result = await query(
         question=request.question,
         filters=filters,
         top_k=request.top_k,
+        history=history,
     )
     return result
 
 
-@router.get("/query/stream")
-async def query_stream_endpoint(
-    question: str = Query(..., description="The question to ask"),
-    books: str | None = Query(None, description="Comma-separated book titles to filter"),
-    characters: str | None = Query(None, description="Comma-separated character names to filter"),
-    locations: str | None = Query(None, description="Comma-separated location names to filter"),
-    top_k: int = Query(8, description="Number of results to retrieve"),
-):
+@router.post("/query/stream")
+async def query_stream_endpoint(request: QueryRequest):
     """Streaming RAG query via Server-Sent Events."""
     filters: dict | None = None
-    if books or characters or locations:
-        filters = {}
-        if books:
-            filters["books"] = [b.strip() for b in books.split(",")]
-        if characters:
-            filters["characters"] = [c.strip() for c in characters.split(",")]
-        if locations:
-            filters["locations"] = [loc.strip() for loc in locations.split(",")]
+    if request.filters:
+        f = request.filters.model_dump(exclude_none=True)
+        if f:
+            filters = f
+
+    history = [m.model_dump() for m in request.history] if request.history else None
 
     async def event_generator():
         async for event in query_stream(
-            question=question,
+            question=request.question,
             filters=filters,
-            top_k=top_k,
+            top_k=request.top_k,
+            history=history,
         ):
             evt = event["event"]
             data = event["data"]

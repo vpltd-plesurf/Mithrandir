@@ -3,9 +3,11 @@ import type {
   CharacterDetail,
   CharacterGraph,
   CharactersResponse,
+  ConversationTurn,
   HealthStatus,
   LibraryResponse,
   LibraryStats,
+  Source,
   UploadResponse,
 } from "./types";
 
@@ -175,22 +177,84 @@ export async function fetchTimelineAges(): Promise<{ ages: string[] }> {
 
 export function queryStream(
   question: string,
-  filters?: { books?: string[]; characters?: string[]; locations?: string[]; top_k?: number }
-): EventSource {
-  const params = new URLSearchParams({ question });
-  if (filters?.books?.length) {
-    params.set("books", filters.books.join(","));
+  history: ConversationTurn[],
+  filters: { books?: string[]; characters?: string[]; locations?: string[]; top_k?: number } | undefined,
+  callbacks: {
+    onToken: (token: string) => void;
+    onSources: (sources: Source[]) => void;
+    onDone: () => void;
+    onError: (message: string) => void;
   }
-  if (filters?.characters?.length) {
-    params.set("characters", filters.characters.join(","));
+): { abort: () => void } {
+  const controller = new AbortController();
+
+  const body: Record<string, unknown> = { question, history };
+  if (filters) {
+    const f: Record<string, unknown> = {};
+    if (filters.books?.length) f.books = filters.books;
+    if (filters.characters?.length) f.characters = filters.characters;
+    if (filters.locations?.length) f.locations = filters.locations;
+    if (Object.keys(f).length) body.filters = f;
   }
-  if (filters?.locations?.length) {
-    params.set("locations", filters.locations.join(","));
-  }
-  if (filters?.top_k) {
-    params.set("top_k", String(filters.top_k));
-  }
-  return new EventSource(`${BACKEND_DIRECT}/query/stream?${params.toString()}`);
+  if (filters?.top_k) body.top_k = filters.top_k;
+
+  (async () => {
+    try {
+      const res = await fetch(`${BACKEND_DIRECT}/query/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!res.ok || !res.body) {
+        callbacks.onError(`Request failed: ${res.status}`);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE events are separated by double newline
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+
+        for (const block of parts) {
+          let eventType = "message";
+          let data = "";
+          for (const line of block.split("\n")) {
+            if (line.startsWith("event: ")) eventType = line.slice(7).trim();
+            else if (line.startsWith("data: ")) data = line.slice(6);
+          }
+          if (eventType === "token") {
+            callbacks.onToken(data);
+          } else if (eventType === "sources") {
+            try { callbacks.onSources(JSON.parse(data)); } catch { /* ignore */ }
+          } else if (eventType === "done") {
+            callbacks.onDone();
+          } else if (eventType === "error") {
+            try {
+              callbacks.onError(JSON.parse(data)?.error ?? "An error occurred.");
+            } catch {
+              callbacks.onError("An error occurred.");
+            }
+          }
+        }
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        callbacks.onError("Stream connection failed.");
+      }
+    }
+  })();
+
+  return { abort: () => controller.abort() };
 }
 
 // --- Battle ---

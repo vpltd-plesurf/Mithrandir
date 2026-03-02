@@ -93,11 +93,17 @@ class QueryFilters(BaseModel):
     characters: list[str] | None = None
 
 
+class ConversationMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+
 class QueryRequest(BaseModel):
     question: str
     filters: QueryFilters | None = None
     top_k: int = 8
     include_sources: bool = True
+    history: list[ConversationMessage] = []
 
 
 class Source(BaseModel):

@@ -190,3 +190,8 @@ export interface ChatMessage {
   sources?: Source[];
   timestamp: Date;
 }
+
+export interface ConversationTurn {
+  role: "user" | "assistant";
+  content: string;
+}

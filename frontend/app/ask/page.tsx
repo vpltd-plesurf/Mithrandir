@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Library, SlidersHorizontal, ChevronDown, ChevronUp, X, User, MapPin } from "lucide-react";
+import { Library, SlidersHorizontal, ChevronDown, ChevronUp, X, User, MapPin, RotateCcw } from "lucide-react";
 import Spinner from "@/components/Spinner";
 import Link from "next/link";
 import type { ChatMessage as ChatMessageType, Source, Book, CharacterSummary, Location } from "@/lib/types";
 import { fetchLibraryStats, fetchLibrary, fetchCharacters, fetchLocations, queryStream } from "@/lib/api";
 import ChatMessageComponent from "@/components/ChatMessage";
 import ChatInput from "@/components/ChatInput";
+import CharacterPromptCards from "@/components/CharacterPromptCards";
 
 export default function AskPage() {
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
@@ -25,7 +26,7 @@ export default function AskPage() {
   const [showLocSuggestions, setShowLocSuggestions] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const esRef = useRef<EventSource | null>(null);
+  const abortRef = useRef<{ abort: () => void } | null>(null);
   const charInputRef = useRef<HTMLInputElement>(null);
   const locInputRef = useRef<HTMLInputElement>(null);
 
@@ -99,6 +100,8 @@ export default function AskPage() {
     (question: string) => {
       if (streaming) return;
 
+      const history = messages.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+
       const userMsg: ChatMessageType = {
         id: (crypto.randomUUID ?? (() => Math.random().toString(36).slice(2)))(),
         role: "user",
@@ -125,80 +128,53 @@ export default function AskPage() {
             locations: selectedLocations.length > 0 ? selectedLocations : undefined,
           }
         : undefined;
-      const es = queryStream(question, filters);
-      esRef.current = es;
 
-      es.addEventListener("token", (e: MessageEvent) => {
-        // data is a plain string token, not JSON
-        const token = e.data;
-        setMessages((prev) => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last.role === "assistant") {
-            updated[updated.length - 1] = {
-              ...last,
-              content: last.content + token,
-            };
-          }
-          return updated;
-        });
+      abortRef.current = queryStream(question, history, filters, {
+        onToken: (token) => {
+          setMessages((cur) => {
+            const updated = [...cur];
+            const last = updated[updated.length - 1];
+            if (last.role === "assistant") {
+              updated[updated.length - 1] = { ...last, content: last.content + token };
+            }
+            return updated;
+          });
+        },
+        onSources: (sources: Source[]) => {
+          setMessages((cur) => {
+            const updated = [...cur];
+            const last = updated[updated.length - 1];
+            if (last.role === "assistant") {
+              updated[updated.length - 1] = { ...last, sources };
+            }
+            return updated;
+          });
+        },
+        onDone: () => {
+          abortRef.current = null;
+          setStreaming(false);
+        },
+        onError: (errorMsg: string) => {
+          setMessages((cur) => {
+            const updated = [...cur];
+            const last = updated[updated.length - 1];
+            if (last.role === "assistant") {
+              updated[updated.length - 1] = { ...last, content: errorMsg };
+            }
+            return updated;
+          });
+          abortRef.current = null;
+          setStreaming(false);
+        },
       });
-
-      es.addEventListener("sources", (e: MessageEvent) => {
-        const sources: Source[] = JSON.parse(e.data) || [];
-        setMessages((prev) => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last.role === "assistant") {
-            updated[updated.length - 1] = { ...last, sources };
-          }
-          return updated;
-        });
-      });
-
-      es.addEventListener("done", () => {
-        es.close();
-        esRef.current = null;
-        setStreaming(false);
-      });
-
-      es.addEventListener("error", (e: MessageEvent) => {
-        let errorMsg = "An error occurred.";
-        try {
-          const data = JSON.parse(e.data);
-          errorMsg = data.error || errorMsg;
-        } catch {
-          // parse failed, use default
-        }
-        setMessages((prev) => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last.role === "assistant") {
-            updated[updated.length - 1] = {
-              ...last,
-              content: errorMsg,
-            };
-          }
-          return updated;
-        });
-        es.close();
-        esRef.current = null;
-        setStreaming(false);
-      });
-
-      es.onerror = () => {
-        es.close();
-        esRef.current = null;
-        setStreaming(false);
-      };
     },
-    [streaming, selectedBooks, selectedCharacters, selectedLocations]
+    [streaming, messages, selectedBooks, selectedCharacters, selectedLocations]
   );
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      esRef.current?.close();
+      abortRef.current?.abort();
     };
   }, []);
 
@@ -242,6 +218,17 @@ export default function AskPage() {
               Ask questions about your Tolkien collection
             </p>
           </div>
+          <div className="flex items-center gap-2">
+            {messages.length > 0 && (
+              <button
+                onClick={() => setMessages([])}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-ui text-text-secondary hover:text-text-primary bg-surface border border-border transition-colors"
+                title="New conversation"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>New</span>
+              </button>
+            )}
           <button
             onClick={() => setFiltersOpen((prev) => !prev)}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-ui transition-colors ${
@@ -263,6 +250,7 @@ export default function AskPage() {
               <ChevronDown className="w-3.5 h-3.5" />
             )}
           </button>
+          </div>
         </div>
 
         {/* Filter panel */}
@@ -507,14 +495,8 @@ export default function AskPage() {
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
-            <p className="font-heading text-base text-accent uppercase tracking-wider">
-              What would you like to know?
-            </p>
-            <p className="text-sm text-text-secondary font-ui max-w-sm">
-              Ask anything about the books in your library. Answers will include
-              citations to the source text.
-            </p>
+          <div className="flex flex-col items-center justify-center h-full py-8">
+            <CharacterPromptCards onSend={handleSend} />
           </div>
         ) : (
           <div className="space-y-4 max-w-3xl mx-auto">

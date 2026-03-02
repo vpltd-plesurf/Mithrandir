@@ -20,6 +20,7 @@ async def query(
     question: str,
     filters: dict | None = None,
     top_k: int = TOP_K,
+    history: list[dict] | None = None,
 ) -> dict:
     """Run a RAG query and return the full response with citations.
 
@@ -58,6 +59,7 @@ async def query(
     # Step 5: Generate answer
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
+        *[{"role": m["role"], "content": m["content"]} for m in (history or [])[-6:]],
         {
             "role": "user",
             "content": f"Context from Tolkien's works:\n\n{context}\n\n---\n\nQuestion: {question}",
@@ -77,6 +79,7 @@ async def query_stream(
     question: str,
     filters: dict | None = None,
     top_k: int = TOP_K,
+    history: list[dict] | None = None,
 ) -> AsyncGenerator[dict, None]:
     """Stream a RAG query response token by token.
 
@@ -121,6 +124,7 @@ async def query_stream(
     # Step 5: Stream from LLM
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
+        *[{"role": m["role"], "content": m["content"]} for m in (history or [])[-6:]],
         {
             "role": "user",
             "content": f"Context from Tolkien's works:\n\n{context}\n\n---\n\nQuestion: {question}",
