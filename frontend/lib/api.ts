@@ -201,12 +201,15 @@ export function queryStream(
 
   (async () => {
     try {
+      // 60s timeout — if no response headers by then, something is broken
+      const timeoutId = setTimeout(() => controller.abort(), 60_000);
       const res = await fetch(`/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!res.ok || !res.body) {
         callbacks.onError(`Request failed: ${res.status}`);
