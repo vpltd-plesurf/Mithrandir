@@ -8,22 +8,38 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_CLIENT_SECRET }}
+          tags: tag:ci
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@master
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          host: 100.68.231.46
-          username: paullesurf
-          key: ${{ secrets.DEPLOY_KEY }}
-          script: |
-            cd /volume1/docker/mithrandir
-            curl -L https://github.com/vpltd-plesurf/Mithrandir/archive/refs/heads/main.zip -o app.zip
-            python3 -m zipfile -e app.zip .
-            cp -rf Mithrandir-main/* .
-            rm -rf Mithrandir-main app.zip
-            sudo docker compose up -d --build
-            echo "Deployment complete!"
+          ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Add Synology to known hosts
+        run: ssh-keyscan -H ${{ secrets.SYNOLOGY_TAILSCALE_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync code to Synology
+        run: |
+          tar czf - \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='frontend/node_modules' \
+            --exclude='frontend/.next' \
+            --exclude='backend/__pycache__' \
+            --exclude='backend/data' \
+            --exclude='books' \
+            . | ssh paullesurf@${{ secrets.SYNOLOGY_TAILSCALE_HOST }} \
+              'cd /volume1/docker/mithrandir && tar xzf - 2>&1 | grep -v "Cannot change mode" || true'
+
+      - name: Rebuild and restart Docker containers
+        run: |
+          ssh paullesurf@${{ secrets.SYNOLOGY_TAILSCALE_HOST }} \
+            'cd /volume1/docker/mithrandir && sudo /usr/local/bin/docker compose down && sudo /usr/local/bin/docker compose up -d --build'
