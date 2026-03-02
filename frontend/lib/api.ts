@@ -229,5 +229,5 @@ export function battleStream(characterA: string, characterB: string): EventSourc
     character_a: characterA,
     character_b: characterB,
   });
-  return new EventSource(`${BACKEND_DIRECT}/battle/stream?${params.toString()}`);
+  return new EventSource(`${API_BASE}/battle/stream?${params.toString()}`);
 }
